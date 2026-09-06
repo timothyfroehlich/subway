@@ -30,12 +30,25 @@ shellcheck bin/subway
 
 ## Issue tracking (beads)
 
-This project uses [beads](https://github.com/steveyegge/beads), sharing PinPoint's infrastructure — the same Dolt sql-server on Bazzite, same `beads` user. Subway is its own database.
+This repository participates in the same logical Beads workspace as PinPoint
+and Huddle. Splitting the code and CI does not split the task graph.
 
-- **Prefix:** `subway` (issues named `subway-<hash>`)
-- **Backend:** `dolt_mode: server` → `beads@100.87.228.116:3306`, database `subway`
-- **Credentials:** `BEADS_DOLT_PASSWORD` must be in the environment; it's in `~/.config/pinpoint/beads-server.env` (shared with PinPoint). `bd` speaks the MySQL wire protocol over Tailscale — the Mac needs no local Dolt data.
-- **Not in git:** `.beads/` is gitignored (issue data lives on the server, connection config is per-machine), matching PinPoint.
+- **Workspace:** database `PP`, project ID and new issue prefix shared with PinPoint
+- **Legacy IDs:** the migrated `subway-*` issues keep their existing IDs
+- **Backend:** the shared Bazzite Dolt server is the tailnet source of truth; one
+  shared DoltHub remote provides asynchronous backup and bridge sync
+- **Credentials:** `BEADS_DOLT_PASSWORD` comes from
+  `~/.config/beads/credentials.env`; the old PinPoint path is only a migration
+  fallback
+- **Not in Git:** `.beads/` contains machine-local connection metadata and is
+  ignored
+
+The canonical registry and repository connector live in the dotfiles Beads
+module. On a new machine, connect this checkout with:
+
+```bash
+~/.agents/beads/beads-connect-repo pinpoint "$PWD"
+```
 
 ```bash
 bd ready            # unblocked work
@@ -44,8 +57,7 @@ bd list / bd show <id>
 bd doctor --server  # confirm the client is talking to the shared server
 ```
 
-No DoltHub mirror is configured yet, so cloud (off-tailnet) sessions can't reach Subway beads — tailnet only for now.
-
 ## Branch & worktree policy
 
-Feature work happens on feature branches; never force-push or rewrite `main` (AGENTS.md §2.3). This repo uses git worktrees under `.claude/worktrees/` — `.beads/` and git hooks resolve to the main checkout, not the worktree.
+Feature work happens in separate linked worktrees on feature branches. Never
+force-push, rewrite, or develop directly on `main` (AGENTS.md §2.3).

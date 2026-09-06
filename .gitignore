@@ -27,3 +27,6 @@ pnpm-debug.log*
 .vscode/
 .idea/
 tmp/
+
+# Beads (issue data lives on the shared Dolt server, not in git; config is per-machine)
+.beads/

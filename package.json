@@ -1,0 +1,11 @@
+{
+  "name": "subway",
+  "version": "0.1.0",
+  "description": "Under-the-playfield token routing via Gemini Flash",
+  "author": "Tim Froehlich",
+  "license": "MIT",
+  "scripts": {
+    "test": "pytest tests/",
+    "check": "ruff check . && ruff format --check . && shellcheck bin/subway"
+  }
+}

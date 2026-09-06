@@ -1,0 +1,218 @@
+#!/usr/bin/env bash
+# Subway: Under-the-playfield token routing via Gemini Flash
+# Usage:
+#   subway read  --question "<question>" --paths <file1> [<file2> ...]
+#   subway write --spec "<spec>" --reference <ref-file> [--target <out-file>]
+#   subway ask   "<prompt>"
+
+set -euo pipefail
+
+# Resolve symlinks to find the real script directory
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do
+  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+BIN_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+REPO_DIR="$(cd "${BIN_DIR}/.." && pwd)"
+WORKER_PY="${REPO_DIR}/lib/gemini_worker.py"
+
+show_help() {
+  cat << 'HELP'
+Subway — Under-the-playfield token routing via Gemini Flash
+
+Usage:
+  subway read  --question "<question>" --paths <file1> [<file2> ...]
+  subway write --spec "<spec>" --reference <ref-file> [--target <out-file>]
+  subway ask   "<prompt>"
+
+Commands:
+  read   Bulk-read files out-of-band and return structured summary bullets
+  write  Generate boilerplate code matching pattern file directly to disk
+  ask    Send a direct prompt to Gemini Flash
+
+Options:
+  --help, -h   Show this help message
+HELP
+}
+
+do_read() {
+  local question=""
+  local paths=()
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --question)
+        question="$2"
+        shift 2
+        ;;
+      --paths)
+        shift
+        while [[ $# -gt 0 && ! "$1" =~ ^-- ]]; do
+          paths+=("$1")
+          shift
+        done
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+
+  if [[ -z "$question" ]]; then
+    echo "Error: --question is required" >&2
+    echo "Usage: subway read --question \"<question>\" --paths <file1> [<file2> ...]" >&2
+    exit 1
+  fi
+
+  if [[ ${#paths[@]} -eq 0 ]]; then
+    echo "Error: --paths is required" >&2
+    echo "Usage: subway read --question \"<question>\" --paths <file1> [<file2> ...]" >&2
+    exit 1
+  fi
+
+  for path in "${paths[@]}"; do
+    if [[ ! -f "$path" || ! -r "$path" ]]; then
+      echo "Error: file not found or unreadable: $path" >&2
+      exit 1
+    fi
+  done
+
+  local tmp_prompt
+  tmp_prompt="$(mktemp)"
+  # shellcheck disable=SC2064
+  trap "rm -f '${tmp_prompt}'" EXIT
+
+  for path in "${paths[@]}"; do
+    {
+      printf '<file path="%s">\n' "$path"
+      cat "$path"
+      printf '\n</file>\n\n'
+    } >> "${tmp_prompt}"
+  done
+
+  printf 'Question: %s\n' "$question" >> "${tmp_prompt}"
+
+  local system_instruction="You are a precise code analyst. Read the provided files and answer the question concisely. Output structured bullets only. No greetings, no prose, no preambles, no summaries. Lead every bullet with the exact name, type, or line number. Use nested bullets for details. Skip anything the caller did not ask for."
+
+  python3 "${WORKER_PY}" \
+    --prompt-file "${tmp_prompt}" \
+    --system-instruction "${system_instruction}" \
+    --temperature 0.2
+}
+
+do_write() {
+  local spec=""
+  local reference=""
+  local target=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --spec)
+        spec="$2"
+        shift 2
+        ;;
+      --reference)
+        reference="$2"
+        shift 2
+        ;;
+      --target)
+        target="$2"
+        shift 2
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+
+  if [[ -z "$spec" ]]; then
+    echo "Error: --spec is required" >&2
+    echo "Usage: subway write --spec \"<what to generate>\" --reference <ref-file> [--target <out-file>]" >&2
+    exit 1
+  fi
+
+  if [[ -z "$reference" ]]; then
+    echo "Error: --reference is required — pass a file whose patterns the output should match." >&2
+    exit 1
+  fi
+
+  if [[ ! -f "$reference" || ! -r "$reference" ]]; then
+    echo "Error: reference file not found or unreadable: $reference" >&2
+    exit 1
+  fi
+
+  local tmp_prompt
+  local tmp_output
+  tmp_prompt="$(mktemp)"
+  tmp_output="$(mktemp)"
+  # shellcheck disable=SC2064
+  trap "rm -f '${tmp_prompt}' '${tmp_output}'" EXIT
+
+  {
+    printf 'Spec: %s\n\n' "$spec"
+    printf 'Reference pattern file (%s):\n' "$reference"
+    cat "$reference"
+  } > "${tmp_prompt}"
+
+  local system_instruction="You generate code files based on a spec and reference files. Match the existing patterns, conventions, naming, and style exactly. Output only the code — no explanations, no markdown fences unless asked. If the spec is ambiguous, make reasonable choices that match the patterns in the reference code."
+
+  python3 "${WORKER_PY}" \
+    --prompt-file "${tmp_prompt}" \
+    --system-instruction "${system_instruction}" \
+    --temperature 0.2 > "${tmp_output}"
+
+  # Strip markdown code fences if model wrapped the code
+  local clean
+  clean=$(sed -E '/^```[a-zA-Z0-9_-]*$/d' "${tmp_output}")
+
+  if [[ -n "$target" ]]; then
+    local target_dir
+    target_dir="$(dirname "$target")"
+    mkdir -p "$target_dir"
+    printf '%s\n' "$clean" > "$target"
+    local lines
+    lines=$(wc -l < "$target" | tr -d ' ')
+    echo "Wrote ${lines} lines to ${target}" >&2
+  else
+    printf '%s\n' "$clean"
+  fi
+}
+
+do_ask() {
+  if [[ $# -eq 0 ]]; then
+    echo "Error: prompt text required for ask" >&2
+    exit 1
+  fi
+  exec python3 "${WORKER_PY}" --prompt "$1"
+}
+
+if [[ $# -eq 0 ]]; then
+  show_help
+  exit 1
+fi
+
+command="$1"
+shift
+
+case "$command" in
+  read)
+    do_read "$@"
+    ;;
+  write)
+    do_write "$@"
+    ;;
+  ask)
+    do_ask "$@"
+    ;;
+  -h|--help|help)
+    show_help
+    exit 0
+    ;;
+  *)
+    echo "Error: unknown command '$command'" >&2
+    show_help >&2
+    exit 1
+    ;;
+esac

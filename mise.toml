@@ -1,0 +1,5 @@
+# Subway project toolchain
+[tools]
+node = "24.19.0"
+python = "3.14.7"
+ruff = "0.16.4"

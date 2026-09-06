@@ -1,0 +1,10 @@
+{
+  "name": "subway",
+  "version": "0.1.0",
+  "description": "Under-the-playfield token routing via Gemini Flash: bulk file reading, code generation, and PreToolUse context protection.",
+  "author": {
+    "name": "Tim Froehlich"
+  },
+  "repository": "https://github.com/timothyfroehlich/subway",
+  "license": "MIT"
+}

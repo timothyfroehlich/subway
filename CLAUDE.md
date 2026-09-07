@@ -40,8 +40,7 @@ and Huddle. Splitting the code and CI does not split the task graph.
 - **Backend:** the shared Bazzite Dolt server is the tailnet source of truth; one
   shared DoltHub remote provides asynchronous backup and bridge sync
 - **Credentials:** `BEADS_DOLT_PASSWORD` comes from
-  `~/.config/beads/credentials.env`; the old PinPoint path is only a migration
-  fallback
+  `~/.config/beads/credentials.env`
 - **Not in Git:** `.beads/` contains machine-local connection metadata and is
   ignored
 
@@ -51,6 +50,9 @@ module. On a new machine, connect this checkout with:
 ```bash
 ~/.agents/beads/beads-connect-repo pinpoint "$PWD"
 ```
+
+Here, `pinpoint` is the shared workspace registry ID; it does not assign this
+repository to the PinPoint codebase.
 
 ```bash
 bd ready            # unblocked work

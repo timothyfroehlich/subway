@@ -24,6 +24,7 @@ shellcheck bin/subway
 
 ### 2.3 Branch & Merge Policy
 - Default branch is `main`.
-- Feature work happens on feature branches in separate linked Git worktrees;
-  keep the canonical checkout on `main` for inspection and synchronization.
+- Feature work happens on feature branches in separate linked Git worktrees.
+- Keep the canonical checkout on `main` for inspection and synchronization;
+  do not develop directly on `main`.
 - Never force-push or rewrite published history on `main`.

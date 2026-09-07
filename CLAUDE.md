@@ -26,15 +26,17 @@ pytest tests/
 shellcheck bin/subway
 ```
 
-`npm run check` / `npm run test` wrap the same commands. Node hooks are `.cjs` (CommonJS, stdlib only) and are only syntax-checked in CI (`node -c`).
+The repository's CI runs these checks directly. Node hooks are `.cjs`
+(CommonJS, stdlib only) and are syntax-checked in CI (`node -c`).
 
 ## Issue tracking (beads)
 
 This repository participates in the same logical Beads workspace as PinPoint
 and Huddle. Splitting the code and CI does not split the task graph.
 
-- **Workspace:** database `PP`, project ID and new issue prefix shared with PinPoint
-- **Legacy IDs:** the migrated `subway-*` issues keep their existing IDs
+- **Workspace:** database `PP`, project ID, and new issue prefix are shared with PinPoint
+- **Legacy IDs:** imported `subway-*` issues intentionally keep their existing IDs; all new issues use the shared `PP-*` prefix
+- **Repository registration:** each code repository connects through the shared workspace registry; identifiers do not encode repository ownership
 - **Backend:** the shared Bazzite Dolt server is the tailnet source of truth; one
   shared DoltHub remote provides asynchronous backup and bridge sync
 - **Credentials:** `BEADS_DOLT_PASSWORD` comes from
@@ -59,5 +61,5 @@ bd doctor --server  # confirm the client is talking to the shared server
 
 ## Branch & worktree policy
 
-Feature work happens in separate linked worktrees on feature branches. Never
-force-push, rewrite, or develop directly on `main` (AGENTS.md §2.3).
+Feature work happens in separate linked Git worktrees on feature branches.
+Never force-push, rewrite, or develop directly on `main` (AGENTS.md §2.3).

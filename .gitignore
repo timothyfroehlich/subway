@@ -27,3 +27,9 @@ pnpm-debug.log*
 .vscode/
 .idea/
 tmp/
+
+# Beads. The embedded Dolt database and its config are machine-local; this
+# project has no remote and no off-machine copy. See AGENTS.md §4.
+.beads/
+.beads-credential-key
+*.db

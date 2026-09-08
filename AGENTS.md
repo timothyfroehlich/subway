@@ -55,10 +55,12 @@ Subway has its own [beads](https://github.com/steveyegge/beads) project, indepen
 
 - **Prefix:** `SBWY` (issues named `SBWY-<hash>`)
 - **Backend:** embedded Dolt at `.beads/embeddeddolt/`, database `SBWY`. No
-  server, no credentials, no network.
-- **No remote, deliberately.** This project is local to one machine and has no
-  off-machine copy. Do not add a Dolt remote.
-- **Not in Git:** `.beads/` is machine-local and gitignored.
+  server and no credentials.
+- **Remote:** this repository's own git `origin`. Dolt history lives in the
+  Subway repo under `refs/dolt/data`, separate from the source branches. No
+  DoltHub account is involved.
+- **Not in Git:** `.beads/` is machine-local and gitignored. The issue data
+  reaches the remote through `refs/dolt/data`, not through any tracked file.
 - Some issues carry legacy `subway-*` IDs from an earlier database. They are
   equally valid; do not renumber them.
 
@@ -67,13 +69,17 @@ bd ready            # unblocked work
 bd create "..." --type bug --priority 2
 bd list / bd show <id>
 bd stats            # database summary
+bd dolt push        # publish local issue history to origin
+bd dolt pull        # fetch issue history from origin
 ```
+
+Nothing pushes on its own. `bd dolt push` after making issue changes, or they
+stay on this machine only.
 
 Two traps specific to this setup:
 
 - **`bd doctor` does not exist in embedded mode.** It prints "not yet supported
   in embedded mode" and exits. Use `bd stats` to confirm the database responds.
-- **`bd init` silently wires a Dolt remote from git `origin`.** There is no
-  `--no-remote` flag. If anyone ever re-runs `bd init` here, immediately run
-  `bd dolt remote remove origin` and confirm with `bd dolt remote list` that no
-  remotes are configured.
+- **Concurrent pushes to a git-protocol Dolt remote can strand remote history.**
+  This is a single-writer setup and that is what keeps it safe. Do not add a
+  second machine or an automated pusher without revisiting it.

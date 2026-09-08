@@ -28,5 +28,8 @@ pnpm-debug.log*
 .idea/
 tmp/
 
-# Beads (issue data lives on the shared Dolt server, not in git; config is per-machine)
+# Beads. The embedded Dolt database and its config are machine-local; this
+# project has no remote and no off-machine copy. See AGENTS.md §4.
 .beads/
+.beads-credential-key
+*.db

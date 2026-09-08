@@ -28,8 +28,9 @@ pnpm-debug.log*
 .idea/
 tmp/
 
-# Beads. The embedded Dolt database and its config are machine-local; this
-# project has no remote and no off-machine copy. See AGENTS.md §4.
+# Beads. The embedded Dolt database and its config are machine-local; issue
+# history reaches origin through refs/dolt/data, not through tracked files.
+# See AGENTS.md §4.
 .beads/
 .beads-credential-key
 *.db

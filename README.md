@@ -43,7 +43,7 @@ Tested against `src/server/db/schema.ts` (1,234 lines, 58 KB):
 
 ### 1. Prerequisites
 - Python 3.10+ (Standard library only; zero pip dependencies).
-- Node.js 18+ (Standard library only; zero npm dependencies).
+- Node.js 18+ (standard-library-only runtime; zero runtime npm dependencies).
 - A Gemini API key from [Google AI Studio](https://aistudio.google.com/).
 
 ### 2. Install CLI
@@ -148,6 +148,22 @@ On failure, `subway watch` automatically extracts failed step logs from the fail
 | `GEMINI_API_KEY` | None | Google AI Studio API key |
 | `SUBWAY_MIN_LINES` | `350` | Line threshold that triggers Subway interception |
 | `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Gemini model to use (`gemini-3.5-flash-lite`, `gemini-3.6-flash`, etc.) |
+
+---
+
+## Development
+
+Install the development dependency once per clone; the `prepare` script enables
+the repository's Husky hooks:
+
+```bash
+pnpm install
+pnpm run lint
+pnpm run test
+```
+
+The pre-commit hook runs the lint gate. GitHub Actions runs the same lint and
+test gates on pull requests and `main` pushes.
 
 ---
 

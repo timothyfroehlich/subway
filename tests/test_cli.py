@@ -26,6 +26,7 @@ def test_subway_help_flag() -> None:
     assert "read" in res.stdout
     assert "write" in res.stdout
     assert "ask" in res.stdout
+    assert "watch" in res.stdout
 
 
 def test_subway_short_help_flag() -> None:

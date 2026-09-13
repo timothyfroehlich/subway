@@ -17,6 +17,7 @@ done
 BIN_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
 REPO_DIR="$(cd "${BIN_DIR}/.." && pwd)"
 WORKER_PY="${REPO_DIR}/lib/gemini_worker.py"
+WATCHER_PY="${REPO_DIR}/lib/watcher.py"
 
 show_help() {
   cat << 'HELP'
@@ -26,11 +27,13 @@ Usage:
   subway read  --question "<question>" --paths <file1> [<file2> ...]
   subway write --spec "<spec>" --reference <ref-file> [--target <out-file>]
   subway ask   "<prompt>"
+  subway watch --pr <pr> --phase <ci|review> --expected-head <sha> [--title <title>] [--worktree <path>]
 
 Commands:
   read   Bulk-read files out-of-band and return structured summary bullets
   write  Generate boilerplate code matching pattern file directly to disk
   ask    Send a direct prompt to Gemini Flash
+  watch  Watch PR CI or review phase using repo pr-watch and return terminal JSON
 
 Options:
   --help, -h   Show this help message
@@ -188,6 +191,10 @@ do_ask() {
   exec python3 "${WORKER_PY}" --prompt "$1"
 }
 
+do_watch() {
+  exec python3 "${WATCHER_PY}" "$@"
+}
+
 if [[ $# -eq 0 ]]; then
   show_help
   exit 1
@@ -205,6 +212,9 @@ case "$command" in
     ;;
   ask)
     do_ask "$@"
+    ;;
+  watch)
+    do_watch "$@"
     ;;
   -h|--help|help)
     show_help

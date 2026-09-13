@@ -67,7 +67,7 @@ def test_watch_invalid_pr_zero(tmp_path: Path) -> None:
         "--worktree",
         str(tmp_path),
     )
-    assert res.returncode == 1
+    assert res.returncode == 2
     assert "PR number must be a positive integer" in res.stderr
 
 
@@ -83,7 +83,7 @@ def test_watch_invalid_expected_head(tmp_path: Path) -> None:
         "--worktree",
         str(tmp_path),
     )
-    assert res.returncode == 1
+    assert res.returncode == 2
     assert "40-character lowercase hex SHA" in res.stderr
 
 
@@ -99,7 +99,7 @@ def test_watch_nonexistent_worktree() -> None:
         "--worktree",
         "/path/does/not/exist/ever",
     )
-    assert res.returncode == 1
+    assert res.returncode == 2
     assert "Worktree directory not found" in res.stderr
 
 
@@ -115,7 +115,7 @@ def test_watch_missing_pr_watch_script(tmp_path: Path) -> None:
         "--worktree",
         str(tmp_path),
     )
-    assert res.returncode == 1
+    assert res.returncode == 2
     assert "pr-watch.py not found in worktree" in res.stderr
 
 
@@ -297,3 +297,75 @@ def test_default_worktree_resolves_cwd(tmp_path: Path) -> None:
     out = json.loads(res.stdout.strip())
     assert out["pr"] == 10
     assert out["outcome"] == "passed"
+
+
+def test_watch_non_json_stdout_emits_undetermined(tmp_path: Path) -> None:
+    scripts_dir = tmp_path / "scripts" / "workflow"
+    scripts_dir.mkdir(parents=True)
+    fake_pr_watch = scripts_dir / "pr-watch.py"
+    fake_pr_watch.write_text(
+        "import sys\nprint('Fatal error: unexpected traceback')\nsys.exit(2)\n"
+    )
+
+    res = _run_subway(
+        "watch",
+        "--pr",
+        "99",
+        "--phase",
+        "ci",
+        "--expected-head",
+        DUMMY_SHA,
+        "--worktree",
+        str(tmp_path),
+    )
+
+    assert res.returncode == 2
+    out = json.loads(res.stdout.strip())
+    assert out["outcome"] == "undetermined"
+    assert out["pr"] == 99
+
+
+def test_watch_action_required_does_not_enrich_failure_summary(
+    tmp_path: Path,
+) -> None:
+    scripts_dir = tmp_path / "scripts" / "workflow"
+    scripts_dir.mkdir(parents=True)
+    fake_pr_watch = scripts_dir / "pr-watch.py"
+
+    fake_payload = {
+        "schema_version": 1,
+        "repository": "owner/repo",
+        "pr": 42,
+        "phase": "review",
+        "expected_head": DUMMY_SHA,
+        "observed_head": DUMMY_SHA,
+        "outcome": "action_required",
+        "ci_gate": "UNKNOWN",
+        "review_state": "reviewed",
+        "unresolved_threads": 2,
+        "merge_state": "CLEAN",
+        "detail_url": None,
+        "failure_artifact": None,
+        "timestamp": "2026-09-12T20:00:00Z",
+    }
+
+    fake_pr_watch.write_text(
+        f"import sys, json\nprint(json.dumps({fake_payload!r}))\nsys.exit(1)\n"
+    )
+
+    res = _run_subway(
+        "watch",
+        "--pr",
+        "42",
+        "--phase",
+        "review",
+        "--expected-head",
+        DUMMY_SHA,
+        "--worktree",
+        str(tmp_path),
+    )
+
+    assert res.returncode == 1
+    out = json.loads(res.stdout.strip())
+    assert out["outcome"] == "action_required"
+    assert "failure_summary" not in out

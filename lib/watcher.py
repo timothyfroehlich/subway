@@ -14,6 +14,7 @@ import os
 import re
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -85,12 +86,28 @@ def extract_failure_summary(artifact_path: Path) -> str | None:
         content,
         re.DOTALL,
     )
-    if match:
+    if match and match.group(1).strip():
         return match.group(1).strip()
+    return None
 
-    # Fallback to returning up to first 100 lines of the artifact
-    lines = content.splitlines()[:100]
-    return "\n".join(lines).strip() or None
+
+def _undetermined_verdict(pr: int, phase: str, expected_head: str) -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "repository": "unknown",
+        "pr": pr,
+        "phase": phase,
+        "expected_head": expected_head,
+        "observed_head": "",
+        "outcome": "undetermined",
+        "ci_gate": "UNKNOWN",
+        "review_state": "unknown",
+        "unresolved_threads": 0,
+        "merge_state": "UNKNOWN",
+        "detail_url": None,
+        "failure_artifact": None,
+        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
 
 
 def run_watch(
@@ -103,7 +120,7 @@ def run_watch(
 ) -> int:
     cmd = [
         sys.executable,
-        "scripts/workflow/pr-watch.py",
+        str(pr_watch_script),
         str(pr),
         "--phase",
         phase,
@@ -137,16 +154,20 @@ def run_watch(
 
     stdout_text = stdout_data.strip() if stdout_data else ""
     if not stdout_text:
-        return exit_code
+        payload = _undetermined_verdict(pr, phase, expected_head)
+        print(json.dumps(payload))
+        return exit_code if exit_code != 0 else 2
 
     try:
         payload = json.loads(stdout_text)
     except json.JSONDecodeError:
-        print(stdout_text)
-        return exit_code
+        sys.stderr.write(f"[subway] Non-JSON output from watcher: {stdout_text}\n")
+        payload = _undetermined_verdict(pr, phase, expected_head)
+        print(json.dumps(payload))
+        return exit_code if exit_code != 0 else 2
 
     outcome = payload.get("outcome")
-    if outcome in ("failed", "action_required") or exit_code != 0:
+    if outcome == "failed":
         artifact_rel = payload.get("failure_artifact")
         if artifact_rel:
             artifact_file = Path(artifact_rel)
@@ -166,7 +187,7 @@ def main(argv: list[str] | None = None) -> int:
         worktree_path, pr_watch_script = validate_args(args)
     except (ValueError, FileNotFoundError) as exc:
         sys.stderr.write(f"Error: {exc}\n")
-        return 1
+        return 2
 
     return run_watch(
         pr=args.pr,

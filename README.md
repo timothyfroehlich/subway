@@ -126,6 +126,19 @@ Quick one-shot queries to Flash:
 subway ask "Explain the difference between optimistic and pessimistic locking in Drizzle ORM"
 ```
 
+### PR Lifecycle Monitoring (`watch`)
+Monitor a PR's CI gate or review phase out-of-band with 0 LLM tokens:
+
+```bash
+subway watch --pr 1234 --phase ci --expected-head 40-character-sha [--title "PR Title"]
+```
+
+Output:
+```json
+{"schema_version": 1, "repository": "owner/repo", "pr": 1234, "phase": "ci", "expected_head": "...", "observed_head": "...", "outcome": "passed", ...}
+```
+On failure, `subway watch` automatically extracts failed step logs from the failure artifact and enriches the terminal JSON with `failure_summary`.
+
 ---
 
 ## Configuration Options

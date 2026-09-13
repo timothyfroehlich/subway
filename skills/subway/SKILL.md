@@ -50,6 +50,16 @@ subway ask "<prompt>"
 
 - Sends prompt directly to Gemini Flash and prints output.
 
+### 4. PR Lifecycle Watch (`watch`)
+
+```bash
+subway watch --pr <pr> --phase <ci|review> --expected-head <sha> [--title <title>] [--worktree <path>]
+```
+
+- **Behavior:** Invokes the repository's native PR lifecycle watcher without LLM mediation.
+- **Context impact:** 0 reasoning tokens during passive waits. Emits authoritative terminal JSON on standard output; on failure, automatically enriches the verdict with an extracted `failure_summary` from the failure report.
+- **Background execution:** Designed to run as a background command in host agent harnesses.
+
 ---
 
 ## PreToolUse Hook Guard

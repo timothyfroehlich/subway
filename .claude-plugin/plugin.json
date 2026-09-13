@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_DIR}/hooks/subway-file-size.cjs\"",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/subway-file-size.cjs\"",
             "timeout": 5
           }
         ]
@@ -25,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_DIR}/hooks/subway-bash-read.cjs\"",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/subway-bash-read.cjs\"",
             "timeout": 5
           }
         ]

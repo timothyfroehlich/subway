@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$PLUGIN_DIR/hooks/subway-file-size.cjs\"",
+            "command": "node \"hooks/subway-file-size.cjs\"",
             "timeout": 5
           }
         ]
@@ -20,7 +20,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$PLUGIN_DIR/hooks/subway-bash-read.cjs\"",
+            "command": "node \"hooks/subway-bash-read.cjs\"",
             "timeout": 5
           }
         ]

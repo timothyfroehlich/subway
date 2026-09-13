@@ -36,8 +36,8 @@ Subway targets three host agents. They share the CLI (`bin/subway`) and worker
 
 | Host | Manifest / wiring | Hook env var | Tool shapes handled |
 | :--- | :--- | :--- | :--- |
-| **Claude Code** | `.claude-plugin/plugin.json` (inline hooks) | `${CLAUDE_PLUGIN_DIR}` | `Read`, `Bash`; `file_path`, `offset`/`limit` |
-| **Antigravity** | `plugin.json` + `hooks/hooks.json` | `$PLUGIN_DIR` | `view_file`, `run_command`; `AbsolutePath`, `StartLine`/`EndLine`, `CommandLine` |
+| **Claude Code** | `.claude-plugin/plugin.json` (inline hooks) | `${CLAUDE_PLUGIN_ROOT}` | `Read`, `Bash`; `file_path`, `offset`/`limit` |
+| **Antigravity** | `plugin.json` + root `hooks.json` | plugin-root working directory | `view_file`, `run_command`; `AbsolutePath`, `StartLine`/`EndLine`, `CommandLine` |
 | **Codex** | not wired yet | — | — |
 
 The root `plugin.json` is the **Antigravity** manifest and

@@ -7,6 +7,8 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).parent.parent
 FILE_SIZE_HOOK = REPO_ROOT / "hooks" / "subway-file-size.cjs"
 BASH_READ_HOOK = REPO_ROOT / "hooks" / "subway-bash-read.cjs"
@@ -171,6 +173,101 @@ def test_check_bash_read_with_flags_blocked(tmp_path: Path) -> None:
     assert output is not None
     assert output["decision"] in ["block", "deny"]
     assert "read --question" in output["reason"]
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "head {path}",
+        "head -20 {path}",
+        "head -n 20 {path}",
+        "head -n20 {path}",
+        "head -n +20 {path}",
+        "head --lines 20 {path}",
+        "head --lines=20 {path}",
+        "head -c 20 {path}",
+        "head --bytes=20 {path}",
+        "tail {path}",
+        "tail -20 {path}",
+        "tail -n 20 {path}",
+        "tail -n20 {path}",
+        "tail -n -20 {path}",
+        "tail --lines 20 {path}",
+        "tail --lines=20 {path}",
+        "tail -c20 {path}",
+        "tail --bytes 20 {path}",
+    ],
+)
+def test_check_bash_bounded_reads_at_threshold_allowed(
+    tmp_path: Path, command: str
+) -> None:
+    _setup_mock_project(tmp_path)
+    large_file = tmp_path / "large.txt"
+    large_file.write_text("\n".join(f"line {i}" for i in range(50)) + "\n")
+
+    env = os.environ.copy()
+    env["GEMINI_API_KEY"] = "mock-key"
+    env["SUBWAY_MIN_LINES"] = "20"
+    env["CLAUDE_PROJECT_DIR"] = str(tmp_path)
+
+    payload = {"tool_input": {"command": command.format(path=large_file)}}
+    code, output = _run_hook(BASH_READ_HOOK, payload, env)
+
+    assert code == 0
+    assert output is None or output.get("decision") == "allow"
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "head -n 21 {path}",
+        "head --lines=21 {path}",
+        "head -n -20 {path}",
+        "head -c -20 {path}",
+        "tail -21 {path}",
+        "tail --lines 21 {path}",
+        "tail -n +20 {path}",
+        "tail --bytes=+20 {path}",
+        "tail -f {path}",
+    ],
+)
+def test_check_bash_reads_over_threshold_blocked(tmp_path: Path, command: str) -> None:
+    _setup_mock_project(tmp_path)
+    large_file = tmp_path / "large.txt"
+    large_file.write_text("\n".join(f"line {i}" for i in range(50)) + "\n")
+
+    env = os.environ.copy()
+    env["GEMINI_API_KEY"] = "mock-key"
+    env["SUBWAY_MIN_LINES"] = "20"
+    env["CLAUDE_PROJECT_DIR"] = str(tmp_path)
+
+    payload = {"tool_input": {"command": command.format(path=large_file)}}
+    code, output = _run_hook(BASH_READ_HOOK, payload, env)
+
+    assert code == 0
+    assert output is not None
+    assert output["decision"] in ["block", "deny"]
+
+
+@pytest.mark.parametrize("reader", ["cat", "less", "more"])
+def test_check_bash_full_dump_commands_remain_blocked(
+    tmp_path: Path, reader: str
+) -> None:
+    _setup_mock_project(tmp_path)
+    large_file = tmp_path / "large.txt"
+    large_file.write_text("\n".join(f"line {i}" for i in range(50)) + "\n")
+
+    env = os.environ.copy()
+    env["GEMINI_API_KEY"] = "mock-key"
+    env["SUBWAY_MIN_LINES"] = "20"
+    env["CLAUDE_PROJECT_DIR"] = str(tmp_path)
+
+    payload = {"tool_input": {"command": f"{reader} {large_file}"}}
+    code, output = _run_hook(BASH_READ_HOOK, payload, env)
+
+    assert code == 0
+    assert output is not None
+    assert output["decision"] in ["block", "deny"]
 
 
 def test_check_bash_read_piped_command_allowed(tmp_path: Path) -> None:

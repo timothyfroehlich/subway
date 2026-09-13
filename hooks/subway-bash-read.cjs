@@ -106,6 +106,109 @@ function countLines(filePath) {
 const READ_COMMANDS = new Set(["cat", "head", "tail", "less", "more"]);
 const FLAG_WITH_VALUE = new Set(["-n", "-c", "-s", "--lines", "--bytes"]);
 
+function parseCount(value) {
+  const match = /^([+-]?)(\d+)$/.exec(value || "");
+  if (!match) {
+    return null;
+  }
+
+  const count = Number(match[2]);
+  if (!Number.isSafeInteger(count)) {
+    return null;
+  }
+
+  return { sign: match[1], count };
+}
+
+function requestedOutput(command, args, fileLines) {
+  let unit = "lines";
+  let parsedCount = { sign: "", count: 10 };
+  let optionsEnded = false;
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+
+    if (arg === "--") {
+      optionsEnded = true;
+      continue;
+    }
+    if (optionsEnded) {
+      continue;
+    }
+
+    if (
+      arg === "-f" ||
+      arg === "-F" ||
+      arg === "--follow" ||
+      arg.startsWith("--follow=") ||
+      arg === "-z" ||
+      arg === "--zero-terminated"
+    ) {
+      return null;
+    }
+
+    let value = null;
+    if (["-n", "--lines", "-c", "--bytes"].includes(arg)) {
+      if (i + 1 >= args.length) {
+        return null;
+      }
+      unit = arg === "-c" || arg === "--bytes" ? "bytes" : "lines";
+      value = args[++i];
+    } else if (arg.startsWith("--lines=")) {
+      unit = "lines";
+      value = arg.slice("--lines=".length);
+    } else if (arg.startsWith("--bytes=")) {
+      unit = "bytes";
+      value = arg.slice("--bytes=".length);
+    } else if (/^-n.+/.test(arg)) {
+      unit = "lines";
+      value = arg.slice(2);
+    } else if (/^-c.+/.test(arg)) {
+      unit = "bytes";
+      value = arg.slice(2);
+    } else if (/^-\d+$/.test(arg)) {
+      unit = "lines";
+      value = arg.slice(1);
+    } else if (command === "tail" && /^\+\d+$/.test(arg)) {
+      unit = "lines";
+      value = arg;
+    } else {
+      continue;
+    }
+
+    parsedCount = parseCount(value);
+    if (!parsedCount) {
+      return null;
+    }
+  }
+
+  // A byte bound of N can emit at most N newline-delimited lines. Treating N
+  // as the line bound is conservative without reading or decoding the file a
+  // second time. Relative byte positions can emit the rest of the file, so
+  // keep treating those as potentially unbounded.
+  if (unit === "bytes") {
+    if (
+      (command === "head" && parsedCount.sign === "-") ||
+      (command === "tail" && parsedCount.sign === "+")
+    ) {
+      return null;
+    }
+    return parsedCount.count;
+  }
+
+  if (command === "head") {
+    if (parsedCount.sign === "-") {
+      return Math.max(fileLines - parsedCount.count, 0);
+    }
+    return Math.min(parsedCount.count, fileLines);
+  }
+
+  if (parsedCount.sign === "+") {
+    return Math.max(fileLines - parsedCount.count + 1, 0);
+  }
+  return Math.min(parsedCount.count, fileLines);
+}
+
 async function main() {
   let inputData = "";
   for await (const chunk of process.stdin) {
@@ -178,7 +281,11 @@ async function main() {
 
       if (fs.existsSync(resolvedPath) && fs.statSync(resolvedPath).isFile()) {
         const lines = countLines(resolvedPath);
-        if (lines > minLines) {
+        const outputLines =
+          segment.command === "head" || segment.command === "tail"
+            ? requestedOutput(segment.command, args, lines)
+            : null;
+        if (lines > minLines && (outputLines === null || outputLines > minLines)) {
           const relativePath = path.relative(projectDir, resolvedPath);
           const reason =
             `File is ${lines} lines (threshold: ${minLines}). ` +

@@ -1,5 +1,6 @@
 {
   "subway-file-size": {
+    "enabled": false,
     "PreToolUse": [
       {
         "matcher": "Read|view_file",
@@ -14,6 +15,7 @@
     ]
   },
   "subway-bash-read": {
+    "enabled": false,
     "PreToolUse": [
       {
         "matcher": "Bash|run_command",

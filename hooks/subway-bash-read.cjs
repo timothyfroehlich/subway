@@ -139,6 +139,7 @@ function requestedOutput(command, args, fileLines) {
     if (
       arg === "-f" ||
       arg === "-F" ||
+      arg === "-r" ||
       arg === "--follow" ||
       arg.startsWith("--follow=") ||
       arg === "-z" ||
@@ -148,11 +149,15 @@ function requestedOutput(command, args, fileLines) {
     }
 
     let value = null;
-    if (["-n", "--lines", "-c", "--bytes"].includes(arg)) {
+    if (["-n", "--lines", "-c", "--bytes", "-b"].includes(arg)) {
       if (i + 1 >= args.length) {
         return null;
       }
-      unit = arg === "-c" || arg === "--bytes" ? "bytes" : "lines";
+      if (arg === "-b") {
+        unit = "blocks";
+      } else {
+        unit = arg === "-c" || arg === "--bytes" ? "bytes" : "lines";
+      }
       value = args[++i];
     } else if (arg.startsWith("--lines=")) {
       unit = "lines";
@@ -165,6 +170,9 @@ function requestedOutput(command, args, fileLines) {
       value = arg.slice(2);
     } else if (/^-c.+/.test(arg)) {
       unit = "bytes";
+      value = arg.slice(2);
+    } else if (command === "tail" && /^-b.+/.test(arg)) {
+      unit = "blocks";
       value = arg.slice(2);
     } else if (/^-\d+$/.test(arg)) {
       unit = "lines";
@@ -186,14 +194,14 @@ function requestedOutput(command, args, fileLines) {
   // as the line bound is conservative without reading or decoding the file a
   // second time. Relative byte positions can emit the rest of the file, so
   // keep treating those as potentially unbounded.
-  if (unit === "bytes") {
+  if (unit === "bytes" || unit === "blocks") {
     if (
       (command === "head" && parsedCount.sign === "-") ||
       (command === "tail" && parsedCount.sign === "+")
     ) {
       return null;
     }
-    return parsedCount.count;
+    return unit === "blocks" ? parsedCount.count * 512 : parsedCount.count;
   }
 
   if (command === "head") {

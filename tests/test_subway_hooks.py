@@ -228,7 +228,9 @@ def test_check_bash_bounded_reads_at_threshold_allowed(
         "tail --lines 21 {path}",
         "tail -n +20 {path}",
         "tail --bytes=+20 {path}",
+        "tail -b 1 {path}",
         "tail -f {path}",
+        "tail -r {path}",
     ],
 )
 def test_check_bash_reads_over_threshold_blocked(tmp_path: Path, command: str) -> None:

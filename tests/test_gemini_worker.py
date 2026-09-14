@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
 
 from gemini_worker import (  # noqa: E402
     invoke_gemini,
+    main,
     resolve_api_key,
 )
 
@@ -136,8 +137,6 @@ def test_invoke_gemini_http_error(status_code: int, msg: str) -> None:
 
 
 def test_main_with_inline_prompt(capsys: pytest.CaptureFixture[str]) -> None:
-    from gemini_worker import main
-
     mock_usage = {
         "promptTokenCount": 100,
         "candidatesTokenCount": 25,
@@ -152,6 +151,22 @@ def test_main_with_inline_prompt(capsys: pytest.CaptureFixture[str]) -> None:
 
     captured = capsys.readouterr()
     assert captured.out == "Model answer\n"
-    assert (
-        "[subway: 100 in, 25 out | delegated to gemini-3.5-flash-lite]" in captured.err
-    )
+    assert "[subway: 100 in -> 25 out (75.0% context saved)]" in captured.err
+
+
+def test_main_cli_prompt_mode_no_savings(capsys: pytest.CaptureFixture[str]) -> None:
+    mock_usage = {
+        "promptTokenCount": 20,
+        "candidatesTokenCount": 50,
+        "totalTokenCount": 70,
+    }
+    with patch("sys.argv", ["gemini_worker.py", "--prompt", "Hello Gemini"]):
+        with patch(
+            "gemini_worker.invoke_gemini", return_value=("Model answer", mock_usage)
+        ):
+            with patch("gemini_worker.resolve_api_key", return_value="mock-key"):
+                main()
+
+    captured = capsys.readouterr()
+    assert captured.out == "Model answer\n"
+    assert "[subway: 20 in -> 50 out]" in captured.err

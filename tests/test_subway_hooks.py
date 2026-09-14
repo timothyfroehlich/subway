@@ -72,6 +72,8 @@ def test_check_file_size_large_file_blocked(tmp_path: Path) -> None:
     assert output["decision"] in ["block", "deny"]
     assert "threshold: 20" in output["reason"]
     assert "read --question" in output["reason"]
+    assert "re-read with offset/limit" not in output["reason"]
+    assert "Tip: Pass all relevant files at once to --paths" in output["reason"]
 
 
 def test_check_file_size_relative_path_resolved(tmp_path: Path) -> None:
@@ -232,6 +234,8 @@ def test_antigravity_view_file_payload_blocked(tmp_path: Path) -> None:
     assert output is not None
     assert output["decision"] == "deny"
     assert "read --question" in output["reason"]
+    assert "In Antigravity, use run_command with CommandLine:" in output["reason"]
+    assert "Tip: Pass all relevant files at once to --paths" in output["reason"]
 
 
 def test_antigravity_run_command_payload_blocked(tmp_path: Path) -> None:
@@ -258,6 +262,8 @@ def test_antigravity_run_command_payload_blocked(tmp_path: Path) -> None:
     assert output is not None
     assert output["decision"] == "deny"
     assert "read --question" in output["reason"]
+    assert "In Antigravity, use run_command with CommandLine:" in output["reason"]
+    assert "Tip: Pass all relevant files at once to --paths" in output["reason"]
 
 
 def test_check_file_size_binary_file_allowed(tmp_path: Path) -> None:

@@ -98,7 +98,7 @@ ln -s ~/Code/subway ~/.gemini/config/plugins/subway
 Extract answers from large files without loading the raw contents into context:
 
 ```bash
-subway read --question "What permissions does checkPermission check?" --paths src/server/db/schema.ts
+subway read --question "What permissions does checkPermission check?" --paths src/server/db/schema.ts [other/files...]
 ```
 
 Output:
@@ -106,7 +106,7 @@ Output:
 - `checkPermission(user, resource)`:
   - Checks role against `RolePermissions` mapping.
   - Enforces owner override for resources where `resource.owner_id === user.id`.
-[subway: 16,489 input tokens, 93 output tokens | delegated to gemini-3.5-flash-lite]
+[subway: 16,489 in -> 93 out (99.4% context saved)]
 ```
 
 ### Boilerplate Code Generation (`write`)

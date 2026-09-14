@@ -186,11 +186,22 @@ async function main() {
   }
 
   const relativePath = path.relative(projectDir, resolvedPath);
+  const isAntigravity = Boolean(
+    input.toolCall ||
+    toolInput.AbsolutePath ||
+    input.tool_name === "view_file" ||
+    toolInput.StartLine !== undefined
+  );
+  const cmdExample = `${subwayCmd} read --question "<what you want to know>" --paths "${relativePath}" [other/relevant/files...]`;
+  const toolHint = isAntigravity
+    ? `In Antigravity, use run_command with CommandLine:\n${cmdExample}`
+    : `Run:\n${cmdExample}`;
+
   const reason =
     `File is ${lines} lines (threshold: ${minLines}). ` +
-    `Route this read through the Subway to save context tokens: ` +
-    `${subwayCmd} read --question "<what you want to know>" --paths "${relativePath}". ` +
-    `If you need exact content for editing, re-read with offset/limit (or StartLine/EndLine) for just the section you need.`;
+    `Do not read large files directly into context. Route this read through Subway instead.\n` +
+    `${toolHint}\n` +
+    `Tip: Pass all relevant files at once to --paths to inspect them together in a single query.`;
 
   const output = {
     decision: "deny",

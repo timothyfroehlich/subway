@@ -185,10 +185,21 @@ async function main() {
         const lines = countLines(resolvedPath);
         if (lines > minLines) {
           const relativePath = path.relative(projectDir, resolvedPath);
+          const isAntigravity = Boolean(
+            input.toolCall ||
+            toolInput.CommandLine ||
+            input.tool_name === "run_command"
+          );
+          const cmdExample = `${subwayCmd} read --question "<what you want to know>" --paths "${relativePath}" [other/relevant/files...]`;
+          const toolHint = isAntigravity
+            ? `In Antigravity, use run_command with CommandLine:\n${cmdExample}`
+            : `Run:\n${cmdExample}`;
+
           const reason =
             `File is ${lines} lines (threshold: ${minLines}). ` +
-            `Route this read through the Subway instead of ${segment.command}: ` +
-            `${subwayCmd} read --question "<what you want to know>" --paths "${relativePath}".`;
+            `Do not read large files directly into context with ${segment.command}. Route this read through Subway instead.\n` +
+            `${toolHint}\n` +
+            `Tip: Pass all relevant files at once to --paths to inspect them together in a single query.`;
 
           const output = {
             decision: "deny",

@@ -103,29 +103,7 @@ function countLines(filePath) {
   }
 }
 
-const BINARY_EXTENSIONS = new Set([
-  ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".bmp", ".tiff", ".tif",
-  ".pdf", ".zip", ".tar", ".gz", ".bz2", ".xz", ".7z", ".rar",
-  ".exe", ".dll", ".so", ".dylib", ".bin", ".wasm", ".pyc", ".class",
-  ".iso", ".dmg", ".mp3", ".mp4", ".mov", ".avi", ".mkv", ".wav", ".flac", ".ogg",
-  ".ttf", ".otf", ".woff", ".woff2", ".eot",
-  ".sqlite", ".sqlite3", ".db",
-]);
-
-function isBinaryFile(filePath) {
-  const ext = path.extname(filePath).toLowerCase();
-  if (BINARY_EXTENSIONS.has(ext)) return true;
-  try {
-    const fd = fs.openSync(filePath, "r");
-    const buffer = Buffer.alloc(4096);
-    const bytesRead = fs.readSync(fd, buffer, 0, 4096, 0);
-    fs.closeSync(fd);
-    for (let i = 0; i < bytesRead; i++) {
-      if (buffer[i] === 0) return true;
-    }
-  } catch {}
-  return false;
-}
+const { isBinaryFile } = require("../lib/binary.cjs");
 
 const READ_COMMANDS = new Set(["cat", "head", "tail", "less", "more"]);
 const FLAG_WITH_VALUE = new Set(["-n", "-c", "-s", "--lines", "--bytes"]);

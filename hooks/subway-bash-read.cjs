@@ -109,6 +109,10 @@ const READ_COMMANDS = new Set(["cat", "head", "tail", "less", "more"]);
 const FLAG_WITH_VALUE = new Set(["-n", "-c", "-s", "--lines", "--bytes"]);
 
 async function main() {
+  if (process.env.SUBWAY_DISABLED === "1") {
+    process.exit(0);
+  }
+
   let inputData = "";
   for await (const chunk of process.stdin) {
     inputData += chunk;
@@ -190,7 +194,7 @@ async function main() {
             toolInput.CommandLine ||
             input.tool_name === "run_command"
           );
-          const cmdExample = `${subwayCmd} read --question "<what you want to know>" --paths "${relativePath}" [other/relevant/files...]`;
+          const cmdExample = `${subwayCmd} read --question "<what you want to know>" --paths "${relativePath}"`;
           const toolHint = isAntigravity
             ? `In Antigravity, use run_command with CommandLine:\n${cmdExample}`
             : `Run:\n${cmdExample}`;

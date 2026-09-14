@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+
+event=$1
+shift
+
+common_dir=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || exit 0
+beads_hook=$(dirname "$common_dir")/.beads/hooks/$event
+
+if [ -x "$beads_hook" ]; then
+  "$beads_hook" "$@"
+fi

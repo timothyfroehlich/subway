@@ -17,10 +17,11 @@ Inspired by Spotify's internal "Portal Shunt" pattern and named after the pinbal
 ### 2.2 Verification
 Before committing changes, run:
 ```bash
-ruff check . && ruff format --check .
-pytest tests/
-shellcheck bin/subway
+pnpm run lint
+pnpm run test
 ```
+
+Run `pnpm install` once per clone to install the Husky pre-commit lint hook.
 
 ### 2.3 Branch & Merge Policy
 - Default branch is `main`.

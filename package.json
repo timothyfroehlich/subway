@@ -1,11 +1,17 @@
 {
   "name": "subway",
   "version": "0.1.0",
+  "packageManager": "pnpm@11.17.0+sha512.cca3cea332ad254bb84145f966d19f4879615210346fc92c79a047f23a0d7b3cca3c3792f0076ba1f1831d277efbcf0a9119b31a9a60eca7fb3d6231f331ef72",
   "description": "Under-the-playfield token routing via Gemini Flash",
   "author": "Tim Froehlich",
   "license": "MIT",
   "scripts": {
     "test": "pytest tests/",
-    "check": "ruff check . && ruff format --check . && shellcheck bin/subway"
+    "lint": "ruff check . && ruff format --check . && shellcheck bin/subway && node --check hooks/subway-file-size.cjs && node --check hooks/subway-bash-read.cjs && node --check lib/resolve-command.cjs",
+    "check": "pnpm run lint && pnpm run test",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7"
   }
 }

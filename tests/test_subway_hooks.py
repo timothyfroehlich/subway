@@ -72,6 +72,8 @@ def test_check_file_size_large_file_blocked(tmp_path: Path) -> None:
     assert output["decision"] in ["block", "deny"]
     assert "threshold: 20" in output["reason"]
     assert "read --question" in output["reason"]
+    assert "re-read with offset/limit" not in output["reason"]
+    assert "Tip: Pass all relevant files at once to --paths" in output["reason"]
 
 
 def test_check_file_size_relative_path_resolved(tmp_path: Path) -> None:
@@ -232,6 +234,8 @@ def test_antigravity_view_file_payload_blocked(tmp_path: Path) -> None:
     assert output is not None
     assert output["decision"] == "deny"
     assert "read --question" in output["reason"]
+    assert "In Antigravity, use run_command with CommandLine:" in output["reason"]
+    assert "Tip: Pass all relevant files at once to --paths" in output["reason"]
 
 
 def test_antigravity_run_command_payload_blocked(tmp_path: Path) -> None:
@@ -258,3 +262,65 @@ def test_antigravity_run_command_payload_blocked(tmp_path: Path) -> None:
     assert output is not None
     assert output["decision"] == "deny"
     assert "read --question" in output["reason"]
+    assert "In Antigravity, use run_command with CommandLine:" in output["reason"]
+    assert "Tip: Pass all relevant files at once to --paths" in output["reason"]
+
+
+def test_check_file_size_binary_file_allowed(tmp_path: Path) -> None:
+    _setup_mock_project(tmp_path)
+    # Create binary file with >20 newline bytes (0x0A) and an image extension
+    binary_file = tmp_path / "screenshot.png"
+    binary_file.write_bytes(b"\x89PNG\r\n\x1a\n\x00\x00" + b"\n" * 50)
+
+    env = os.environ.copy()
+    env["GEMINI_API_KEY"] = "mock-key"
+    env["SUBWAY_MIN_LINES"] = "20"
+    env["CLAUDE_PROJECT_DIR"] = str(tmp_path)
+
+    payload = {"tool_input": {"file_path": str(binary_file)}}
+    code, output = _run_hook(FILE_SIZE_HOOK, payload, env)
+
+    assert code == 0
+    assert output is None or output.get("decision") == "allow"
+
+
+def test_check_bash_read_binary_file_allowed(tmp_path: Path) -> None:
+    _setup_mock_project(tmp_path)
+    binary_file = tmp_path / "data.bin"
+    # Null bytes + newlines
+    binary_file.write_bytes(b"DATA\x00\x01\x02" + b"\n" * 50)
+
+    env = os.environ.copy()
+    env["GEMINI_API_KEY"] = "mock-key"
+    env["SUBWAY_MIN_LINES"] = "20"
+    env["CLAUDE_PROJECT_DIR"] = str(tmp_path)
+
+    payload = {"tool_input": {"command": f"cat {binary_file}"}}
+    code, output = _run_hook(BASH_READ_HOOK, payload, env)
+
+    assert code == 0
+    assert output is None or output.get("decision") == "allow"
+
+
+def test_subway_disabled_env_bypasses_hooks(tmp_path: Path) -> None:
+    _setup_mock_project(tmp_path)
+    large_file = tmp_path / "large.txt"
+    large_file.write_text("\n".join(f"line {i}" for i in range(50)) + "\n")
+
+    env = os.environ.copy()
+    env["GEMINI_API_KEY"] = "mock-key"
+    env["SUBWAY_MIN_LINES"] = "20"
+    env["SUBWAY_DISABLED"] = "1"
+    env["CLAUDE_PROJECT_DIR"] = str(tmp_path)
+
+    # Test file size hook
+    payload_file = {"tool_input": {"file_path": str(large_file)}}
+    code, output = _run_hook(FILE_SIZE_HOOK, payload_file, env)
+    assert code == 0
+    assert output is None or output.get("decision") == "allow"
+
+    # Test bash read hook
+    payload_bash = {"tool_input": {"command": f"cat {large_file}"}}
+    code, output = _run_hook(BASH_READ_HOOK, payload_bash, env)
+    assert code == 0
+    assert output is None or output.get("decision") == "allow"

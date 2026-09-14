@@ -103,10 +103,16 @@ function countLines(filePath) {
   }
 }
 
+const { isBinaryFile } = require("../lib/binary.cjs");
+
 const READ_COMMANDS = new Set(["cat", "head", "tail", "less", "more"]);
 const FLAG_WITH_VALUE = new Set(["-n", "-c", "-s", "--lines", "--bytes"]);
 
 async function main() {
+  if (process.env.SUBWAY_DISABLED === "1") {
+    process.exit(0);
+  }
+
   let inputData = "";
   for await (const chunk of process.stdin) {
     inputData += chunk;
@@ -177,23 +183,39 @@ async function main() {
         : path.resolve(projectDir, arg);
 
       if (fs.existsSync(resolvedPath) && fs.statSync(resolvedPath).isFile()) {
+        if (isBinaryFile(resolvedPath)) {
+          continue;
+        }
         const lines = countLines(resolvedPath);
         if (lines > minLines) {
           const relativePath = path.relative(projectDir, resolvedPath);
+          const isAntigravity = Boolean(
+            input.toolCall ||
+            toolInput.CommandLine ||
+            input.tool_name === "run_command"
+          );
+          const cmdExample = `${subwayCmd} read --question "<what you want to know>" --paths "${relativePath}"`;
+          const toolHint = isAntigravity
+            ? `In Antigravity, use run_command with CommandLine:\n${cmdExample}`
+            : `Run:\n${cmdExample}`;
+
           const reason =
             `File is ${lines} lines (threshold: ${minLines}). ` +
-            `Route this read through the Subway instead of ${segment.command}: ` +
-            `${subwayCmd} read --question "<what you want to know>" --paths "${relativePath}".`;
+            `Do not read large files directly into context with ${segment.command}. Route this read through Subway instead.\n` +
+            `${toolHint}\n` +
+            `Tip: Pass all relevant files at once to --paths to inspect them together in a single query.`;
 
-          const output = {
-            decision: "deny",
-            reason,
-            hookSpecificOutput: {
-              hookEventName: "PreToolUse",
-              permissionDecision: "deny",
-              permissionDecisionReason: reason,
-            },
-          };
+          const output = isAntigravity
+            ? { decision: "deny", reason }
+            : {
+                decision: "deny",
+                reason,
+                hookSpecificOutput: {
+                  hookEventName: "PreToolUse",
+                  permissionDecision: "deny",
+                  permissionDecisionReason: reason,
+                },
+              };
 
           process.stdout.write(JSON.stringify(output));
           process.exit(0);

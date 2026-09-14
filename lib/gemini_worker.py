@@ -217,9 +217,14 @@ def main() -> None:
 
     in_tokens = usage.get("promptTokenCount", 0)
     out_tokens = usage.get("candidatesTokenCount", 0)
-    summary = (
-        f"[subway: {in_tokens} in, {out_tokens} out | delegated to {args.model}]\n"
-    )
+    if in_tokens > 0 and in_tokens > out_tokens:
+        saved_pct = ((in_tokens - out_tokens) / in_tokens) * 100
+        summary = (
+            f"[subway: {in_tokens:,} in -> {out_tokens:,} out "
+            f"({saved_pct:.1f}% context saved)]\n"
+        )
+    else:
+        summary = f"[subway: {in_tokens:,} in -> {out_tokens:,} out]\n"
     sys.stderr.write(summary)
 
 

@@ -32,6 +32,16 @@ subway read --question "<what you want to know>" --paths <file1> [<file2> ...]
 
 - **Returns:** Concise, high-fidelity bullet points. Each bullet leads with exact symbols, line numbers, or types.
 - **Context impact:** Only the concise bullet response enters your conversation context.
+- **Pass all relevant paths:** Pass all files that might be relevant to your question at once under `--paths`. Flash will correlate across all specified files in a single pass without loading thousands of lines into the primary agent's context.
+
+#### Antigravity Invocation
+In Antigravity, invoke `subway` via `run_command`:
+```json
+{
+  "tool": "run_command",
+  "CommandLine": "subway read --question \"<question>\" --paths file1 file2"
+}
+```
 
 ### 2. Boilerplate Code Generation (`write`)
 
@@ -41,6 +51,14 @@ subway write --spec "<what to build>" --reference <pattern_file> [--target <out_
 
 - **Behavior:** Matches conventions, types, imports, and style of the reference file.
 - **Context impact:** When `--target` is provided, code writes directly to disk with **0 context tokens** entering the conversation stream.
+
+### Delegation Boundaries
+
+| Delegate to Subway (Flash) | Keep in Primary Agent Context |
+| :--- | :--- |
+| **Exploration & Discovery**: "Where is X defined across these 5 files?" | **Surgical Edits**: Precise line numbers and byte indentation needed by diff tools. |
+| **Monolithic Files**: Reading files $> 350$ lines. | **Subtle Concurrency & Deep Logic**: Thread safety, invariants, architectural trade-offs. |
+| **Repetitive Boilerplate**: Tests, mocks, types matching a reference pattern. | **Binary Files**: Images, PDFs, archives, SQLite databases. |
 
 ### 3. Direct Prompt (`ask`)
 

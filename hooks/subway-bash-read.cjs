@@ -201,15 +201,17 @@ async function main() {
             `${toolHint}\n` +
             `Tip: Pass all relevant files at once to --paths to inspect them together in a single query.`;
 
-          const output = {
-            decision: "deny",
-            reason,
-            hookSpecificOutput: {
-              hookEventName: "PreToolUse",
-              permissionDecision: "deny",
-              permissionDecisionReason: reason,
-            },
-          };
+          const output = isAntigravity
+            ? { decision: "deny", reason }
+            : {
+                decision: "deny",
+                reason,
+                hookSpecificOutput: {
+                  hookEventName: "PreToolUse",
+                  permissionDecision: "deny",
+                  permissionDecisionReason: reason,
+                },
+              };
 
           process.stdout.write(JSON.stringify(output));
           process.exit(0);

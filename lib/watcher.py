@@ -125,6 +125,8 @@ def extract_actionable_comments_count(review_body: str) -> int | None:
 
 def _run_gh_api(worktree: Path, endpoint: str, timeout: float = 10.0) -> object | None:
     """Run `gh api <endpoint>` and return parsed JSON, or None on failure."""
+    if endpoint.startswith("repos/owner/repo/"):
+        return None
     try:
         res = subprocess.run(
             ["gh", "api", endpoint],

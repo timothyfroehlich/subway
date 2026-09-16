@@ -744,3 +744,56 @@ def test_enrich_review_payload_fail_open_on_gh_error(
     # Should not raise exception
     enriched = enrich_review_payload(payload, tmp_path, DUMMY_SHA, 100)
     assert enriched["outcome"] == "passed"
+
+
+def test_fetch_pr_reviews_and_comments_pagination(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import watcher
+
+    calls: list[str] = []
+
+    def mock_run_gh_api(_worktree: Path, endpoint: str, **_kwargs: object) -> object:
+        calls.append(endpoint)
+        if "page=1" in endpoint:
+            return [{"id": i} for i in range(100)]
+        elif "page=2" in endpoint:
+            return [{"id": 100 + i} for i in range(25)]
+        return []
+
+    monkeypatch.setattr(watcher, "_run_gh_api", mock_run_gh_api)
+
+    reviews = watcher.fetch_pr_reviews(tmp_path, "owner/repo", 42)
+    assert len(reviews) == 125
+    assert any("page=1" in c for c in calls)
+    assert any("page=2" in c for c in calls)
+
+    calls.clear()
+    comments = watcher.fetch_pr_comments(tmp_path, "owner/repo", 42)
+    assert len(comments) == 125
+    assert any("page=1" in c for c in calls)
+    assert any("page=2" in c for c in calls)
+
+
+def test_inspect_state_with_null_actors() -> None:
+    from watcher import inspect_coderabbit_state, inspect_codex_state
+
+    statuses = [
+        {"context": "CodeRabbit", "state": "pending", "creator": None},
+        {"context": "other", "state": "success", "creator": None},
+    ]
+    reviews = [
+        {"user": None, "commit_id": DUMMY_SHA, "state": "COMMENTED"},
+        {"user": {"login": None}, "commit_id": DUMMY_SHA, "state": "APPROVED"},
+    ]
+    comments = [
+        {"user": None, "body": "hello"},
+        {"user": {"login": None}, "body": "world"},
+        {"user": None, "performed_via_github_app": None, "body": "test"},
+    ]
+
+    cr_state = inspect_coderabbit_state(statuses, reviews, comments, DUMMY_SHA)
+    assert cr_state["state"] == "in_progress"
+
+    codex_state = inspect_codex_state(reviews, comments, DUMMY_SHA)
+    assert codex_state["state"] == "none"

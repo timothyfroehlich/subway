@@ -143,6 +143,7 @@ Output:
   - **Concurrent Review Adjudication:** Reports on first success while alerting the caller if a second reviewer is still in progress (`concurrent_review_in_progress`, `pending_reviewers`, `review_notes`).
   - **Rate-Limit Management:** Detects CodeRabbit quota exhaustion (5 reviews/hr) and directs fallback (`coderabbit_rate_limited: true`, `review_fallback: "codex"`).
   - **Findings Extraction:** Extracts actionable AI agent prompts and comments into `review_summary` and `actionable_comments`.
+- **Pre-Review Prerequisite:** Always wait for current-head CI to pass before requesting or watching for review; never request code review on a PR that is failing or pending CI.
 
 ---
 

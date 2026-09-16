@@ -82,6 +82,7 @@ subway watch --pr <pr> --phase <ci|review> --expected-head <sha> [--title <title
   - **Concurrent Review Adjudication:** Resolves on first success and tracks trailing in-progress reviewers (`concurrent_review_in_progress`, `pending_reviewers`, `review_notes`).
   - **Rate-Limit Management:** Detects CodeRabbit quota exhaustion (5 reviews/hr) and triggers fallback (`coderabbit_rate_limited: true`, `review_fallback: "codex"`).
   - **Findings Extraction:** Extracts actionable AI agent prompts and comment counts into `review_summary` and `actionable_comments`.
+- **Pre-Review Requirement:** Always wait for current-head CI to pass before requesting or watching for review. Never request automated or manual code reviews on a PR that is failing or pending CI.
 - **Background execution:** Designed to run as a background command in host agent harnesses.
 
 ---
@@ -101,6 +102,6 @@ Subway enforces context discipline automatically via PreToolUse hooks:
 
 ## Configuration
 
-- `GEMINI_API_KEY`: API key for Google AI Studio (resolved from env, `~/.config/subway/api_key`, `~/.config/pinpoint/gemini_api_key`, `~/.claude/settings.json`, or `.env.local`).
+- `GEMINI_API_KEY`: API key for Google AI Studio (resolved from environment variables, `~/.config/subway/api_key`, `~/.config/pinpoint/gemini_api_key`, or `.env.local`).
 - `SUBWAY_MIN_LINES`: Minimum line threshold to trigger Subway interception (default: `350`).
 - `GEMINI_MODEL`: Model override (default: `gemini-3.5-flash-lite`).

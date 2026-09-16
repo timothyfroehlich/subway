@@ -166,21 +166,44 @@ def resolve_repo_slug(worktree: Path, payload: dict[str, object]) -> str | None:
 
 
 def fetch_pr_reviews(worktree: Path, owner_repo: str, pr: int) -> list[dict]:
-    data = _run_gh_api(worktree, f"repos/{owner_repo}/pulls/{pr}/reviews")
-    if isinstance(data, list):
-        return [r for r in data if isinstance(r, dict)]
-    return []
+    reviews: list[dict] = []
+    page = 1
+    while True:
+        data = _run_gh_api(
+            worktree, f"repos/{owner_repo}/pulls/{pr}/reviews?per_page=100&page={page}"
+        )
+        if isinstance(data, list) and data:
+            reviews.extend([r for r in data if isinstance(r, dict)])
+            if len(data) < 100:
+                break
+            page += 1
+        else:
+            break
+    return reviews
 
 
 def fetch_pr_comments(worktree: Path, owner_repo: str, pr: int) -> list[dict]:
-    data = _run_gh_api(worktree, f"repos/{owner_repo}/issues/{pr}/comments")
-    if isinstance(data, list):
-        return [c for c in data if isinstance(c, dict)]
-    return []
+    comments: list[dict] = []
+    page = 1
+    while True:
+        data = _run_gh_api(
+            worktree,
+            f"repos/{owner_repo}/issues/{pr}/comments?per_page=100&page={page}",
+        )
+        if isinstance(data, list) and data:
+            comments.extend([c for c in data if isinstance(c, dict)])
+            if len(data) < 100:
+                break
+            page += 1
+        else:
+            break
+    return comments
 
 
 def fetch_commit_statuses(worktree: Path, owner_repo: str, head_sha: str) -> list[dict]:
-    data = _run_gh_api(worktree, f"repos/{owner_repo}/commits/{head_sha}/statuses")
+    data = _run_gh_api(
+        worktree, f"repos/{owner_repo}/commits/{head_sha}/statuses?per_page=100"
+    )
     if isinstance(data, list):
         return [s for s in data if isinstance(s, dict)]
     return []
@@ -213,14 +236,14 @@ def inspect_coderabbit_state(
         s
         for s in statuses
         if s.get("context") == "CodeRabbit"
-        or (s.get("creator", {}).get("login") == CODERABBIT_BOT)
+        or ((s.get("creator") or {}).get("login") == CODERABBIT_BOT)
     ]
     status_pending = False
     if cr_statuses and cr_statuses[0].get("state") == "pending":
         status_pending = True
 
     all_cr_reviews = [
-        r for r in reviews if r.get("user", {}).get("login") == CODERABBIT_BOT
+        r for r in reviews if (r.get("user") or {}).get("login") == CODERABBIT_BOT
     ]
 
     cr_reviews_on_head = [r for r in all_cr_reviews if r.get("commit_id") == head_sha]
@@ -249,7 +272,7 @@ def inspect_coderabbit_state(
     latest_review_request_ts: datetime | None = None
 
     for idx, c in enumerate(comments):
-        user_login = c.get("user", {}).get("login") or ""
+        user_login = (c.get("user") or {}).get("login") or ""
         body = c.get("body") or ""
         default_ts = datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=idx)
         c_ts = _extract_iso_ts(c, "created_at", default_ts)
@@ -344,7 +367,7 @@ def inspect_codex_state(
     codex_reviews_on_head = [
         r
         for r in reviews
-        if (r.get("user", {}).get("login") == CODEX_BOT)
+        if (((r.get("user") or {}).get("login")) == CODEX_BOT)
         and (r.get("commit_id") == head_sha)
     ]
 
@@ -364,7 +387,7 @@ def inspect_codex_state(
     codex_requested = False
 
     for c in comments:
-        user_login = c.get("user", {}).get("login") or ""
+        user_login = (c.get("user") or {}).get("login") or ""
         app_slug = (c.get("performed_via_github_app") or {}).get("slug") or ""
         body = c.get("body") or ""
 

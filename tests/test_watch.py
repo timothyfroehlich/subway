@@ -469,6 +469,93 @@ def test_inspect_coderabbit_state_changes_requested() -> None:
     assert st["review_summary"] == "Fix issue"
 
 
+def test_inspect_coderabbit_state_stale_request_on_new_head() -> None:
+    old_sha = "1" * 40
+    new_sha = "2" * 40
+    reviews = [
+        {
+            "user": {"login": "coderabbitai[bot]"},
+            "commit_id": old_sha,
+            "state": "COMMENTED",
+            "submitted_at": "2026-09-16T10:05:00Z",
+        }
+    ]
+    comments = [
+        {
+            "user": {"login": "developer"},
+            "body": "@coderabbitai review",
+            "created_at": "2026-09-16T10:00:00Z",
+        }
+    ]
+    st = inspect_coderabbit_state([], reviews, comments, new_sha)
+    assert st["state"] == "none"
+    assert st["covers"] is False
+
+
+def test_inspect_coderabbit_state_fresh_request_on_new_head() -> None:
+    old_sha = "1" * 40
+    new_sha = "2" * 40
+    reviews = [
+        {
+            "user": {"login": "coderabbitai[bot]"},
+            "commit_id": old_sha,
+            "state": "COMMENTED",
+            "submitted_at": "2026-09-16T10:05:00Z",
+        }
+    ]
+    comments = [
+        {
+            "user": {"login": "developer"},
+            "body": "@coderabbitai review",
+            "created_at": "2026-09-16T10:10:00Z",
+        }
+    ]
+    st = inspect_coderabbit_state([], reviews, comments, new_sha)
+    assert st["state"] == "in_progress"
+
+
+def test_inspect_coderabbit_state_stale_rate_limit_cleared_by_newer_review() -> None:
+    reviews = [
+        {
+            "user": {"login": "coderabbitai[bot]"},
+            "commit_id": DUMMY_SHA,
+            "state": "COMMENTED",
+            "submitted_at": "2026-09-16T10:15:00Z",
+        }
+    ]
+    comments = [
+        {
+            "user": {"login": "coderabbitai[bot]"},
+            "body": "Review rate limited. Try again later.",
+            "created_at": "2026-09-16T10:10:00Z",
+        }
+    ]
+    st = inspect_coderabbit_state([], reviews, comments, DUMMY_SHA)
+    assert st["rate_limited"] is False
+    assert st["state"] == "none"
+
+
+def test_inspect_coderabbit_state_rate_limit_newer_than_completed_review() -> None:
+    reviews = [
+        {
+            "user": {"login": "coderabbitai[bot]"},
+            "commit_id": DUMMY_SHA,
+            "state": "COMMENTED",
+            "submitted_at": "2026-09-16T10:05:00Z",
+        }
+    ]
+    comments = [
+        {
+            "user": {"login": "coderabbitai[bot]"},
+            "body": "Review rate limited. Try again later.",
+            "created_at": "2026-09-16T10:10:00Z",
+        }
+    ]
+    st = inspect_coderabbit_state([], reviews, comments, DUMMY_SHA)
+    assert st["rate_limited"] is True
+    assert st["state"] == "rate_limited"
+
+
 def test_inspect_codex_state_in_progress() -> None:
     comments = [
         {

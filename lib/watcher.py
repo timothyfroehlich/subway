@@ -14,7 +14,7 @@ import os
 import re
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -186,6 +186,22 @@ def fetch_commit_statuses(worktree: Path, owner_repo: str, head_sha: str) -> lis
     return []
 
 
+def _extract_iso_ts(d: dict, key: str, default: datetime) -> datetime:
+    val = d.get(key)
+    if val and isinstance(val, str):
+        try:
+            ts = val
+            if ts.endswith("Z"):
+                ts = ts[:-1] + "+00:00"
+            dt = datetime.fromisoformat(ts)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt
+        except Exception:
+            pass
+    return default
+
+
 def inspect_coderabbit_state(
     statuses: list[dict],
     reviews: list[dict],
@@ -203,12 +219,11 @@ def inspect_coderabbit_state(
     if cr_statuses and cr_statuses[0].get("state") == "pending":
         status_pending = True
 
-    cr_reviews_on_head = [
-        r
-        for r in reviews
-        if (r.get("user", {}).get("login") == CODERABBIT_BOT)
-        and (r.get("commit_id") == head_sha)
+    all_cr_reviews = [
+        r for r in reviews if r.get("user", {}).get("login") == CODERABBIT_BOT
     ]
+
+    cr_reviews_on_head = [r for r in all_cr_reviews if r.get("commit_id") == head_sha]
 
     has_approved = False
     has_changes_requested = False
@@ -229,23 +244,75 @@ def inspect_coderabbit_state(
         if count is not None and actionable_comments is None:
             actionable_comments = count
 
-    rate_limited = False
-    review_requested = False
-    for c in comments:
+    latest_rate_limit_ts: datetime | None = None
+    latest_unblock_ts: datetime | None = None
+    latest_review_request_ts: datetime | None = None
+
+    for idx, c in enumerate(comments):
         user_login = c.get("user", {}).get("login") or ""
         body = c.get("body") or ""
+        default_ts = datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=idx)
+        c_ts = _extract_iso_ts(c, "created_at", default_ts)
         if user_login == CODERABBIT_BOT:
             if "Review rate limited" in body or (
                 "Action not completed" in body and "rate limit" in body.lower()
             ):
-                rate_limited = True
+                if latest_rate_limit_ts is None or c_ts > latest_rate_limit_ts:
+                    latest_rate_limit_ts = c_ts
             elif "Review finished" in body or "Full review finished" in body:
-                rate_limited = False
+                if latest_unblock_ts is None or c_ts > latest_unblock_ts:
+                    latest_unblock_ts = c_ts
         if "@coderabbitai review" in body or "@coderabbitai full review" in body:
-            review_requested = True
+            if latest_review_request_ts is None or c_ts > latest_review_request_ts:
+                latest_review_request_ts = c_ts
 
-    if has_approved or (cr_reviews_on_head and not rate_limited):
+    rate_limited = False
+    if latest_rate_limit_ts is not None:
+        if latest_unblock_ts is None or latest_rate_limit_ts > latest_unblock_ts:
+            rate_limited = True
+
+    review_requested = False
+    if latest_review_request_ts is not None:
+        if not all_cr_reviews:
+            review_requested = True
+        else:
+            latest_cr_review_ts = max(
+                (
+                    _extract_iso_ts(
+                        r,
+                        "submitted_at",
+                        datetime(2026, 1, 1, tzinfo=timezone.utc)
+                        + timedelta(seconds=i),
+                    )
+                    for i, r in enumerate(all_cr_reviews)
+                ),
+                default=datetime.min.replace(tzinfo=timezone.utc),
+            )
+            if latest_review_request_ts > latest_cr_review_ts:
+                review_requested = True
+
+    # Clear rate_limited:
+    # 1. Unconditionally if has_approved is True
+    # 2. If cr_reviews_on_head has a completed review newer than the rate limit comment
+    if has_approved:
         rate_limited = False
+    elif rate_limited and cr_reviews_on_head:
+        latest_head_review_ts = max(
+            (
+                _extract_iso_ts(
+                    r,
+                    "submitted_at",
+                    datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=i),
+                )
+                for i, r in enumerate(cr_reviews_on_head)
+            ),
+            default=datetime.min.replace(tzinfo=timezone.utc),
+        )
+        if (
+            latest_rate_limit_ts is not None
+            and latest_head_review_ts > latest_rate_limit_ts
+        ):
+            rate_limited = False
 
     if has_approved:
         state = "covers"

@@ -13,15 +13,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Python and Ruff
+        uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518  # ratchet:jdx/mise-action@v4.2.5
         with:
-          python-version: "3.12"
+          install: true
+          cache: true
+          install_args: "python ruff"
 
-      - name: Install dependencies
+      - name: Verify Python version
         run: |
-          python -m pip install --upgrade pip
-          pip install ruff pytest
+          set -euo pipefail
+          python_version="$(python3 --version | cut -d' ' -f2)"
+          expected_python="$(python3 -c 'import tomllib; print(tomllib.load(open("mise.toml", "rb"))["tools"]["python"])')"
+          if [[ "$python_version" != "$expected_python" ]]; then
+            echo "::error::Python version mismatch: expected ${expected_python}, got ${python_version}"
+            exit 1
+          fi
+          echo "Python ${python_version}"
+
+      - name: Install test dependencies
+        run: python -m pip install pytest
 
       - name: Run Ruff Linter
         run: ruff check .

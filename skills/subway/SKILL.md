@@ -102,6 +102,6 @@ Subway enforces context discipline automatically via PreToolUse hooks:
 
 ## Configuration
 
-- `GEMINI_API_KEY`: API key for Google AI Studio (resolved from environment variables, `~/.config/subway/api_key`, `~/.config/pinpoint/gemini_api_key`, or `.env.local`).
+- `GEMINI_API_KEY`: API key for Google AI Studio (resolved from env, `~/.config/subway/api_key`, `~/.config/pinpoint/gemini_api_key`, `~/.claude/settings.json`, or `.env.local`).
 - `SUBWAY_MIN_LINES`: Minimum line threshold to trigger Subway interception (default: `350`).
 - `GEMINI_MODEL`: Model override (default: `gemini-3.5-flash-lite`).

@@ -1,0 +1,68 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+#
+# CodeRabbit review configuration for Subway.
+#
+# CANONICAL SOURCE: `AGENTS.md` at the repo root defines the project mission,
+# critical non-negotiables, and implementation rules.
+language: en-US
+
+tone_instructions: |
+  Be direct and technical. No preamble, no praise, no summary of what the code
+  does. State the problem, cite the rule/doc, propose the fix.
+
+reviews:
+  request_changes_workflow: true
+  review_details: true
+  suggested_reviewers: false
+  profile: chill
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  collapse_walkthrough: true
+  review_status: true
+  poem: false
+
+  auto_review:
+    # Automatic on draft promotion (priority: CodeRabbit -> Codex -> manual).
+    # New PRs start in draft; promoting out of draft triggers an automatic review.
+    # Subsequent commits require an explicit request:
+    #   gh pr comment <PR> --body "@coderabbitai review"
+    # Hourly quota ceiling is 5 reviews/hr.
+    enabled: true
+    drafts: false
+    auto_incremental_review: false
+    auto_pause_after_reviewed_commits: 1
+
+  path_instructions:
+    - path: "**"
+      instructions: |
+        Read `/AGENTS.md` before reviewing.
+
+        Zero Runtime Dependencies: Core Python tools (`lib/gemini_worker.py`,
+        `lib/watcher.py`) and Node hooks (`hooks/`) must rely strictly on
+        standard libraries (`urllib.request`, `json`, `pathlib`, `fs`, `path`, etc.).
+        Never introduce runtime dependencies or external SDK packages.
+
+        Fail-Open Safety: PreToolUse hooks and monitoring runners MUST fail open
+        if `GEMINI_API_KEY` is not found, `gh` fails, or `subway` cannot be resolved.
+        A caller or agent harness must never be blocked or stranded by hook infrastructure failure.
+
+        Pass-through Targeted Reads: Targeted reads (offsets, line ranges <= 350,
+        piped commands, redirections) must pass through unhindered.
+
+        Symlink Resilience: `bin/subway` must resolve real paths across symlinks
+        on both macOS and Linux.
+
+    - path: "lib/**"
+      instructions: |
+        Python standard library only. Must remain compatible with Python 3.10+.
+        Preserve quote-aware shell parsing and process monitoring fail-open guarantees.
+
+    - path: "hooks/**"
+      instructions: |
+        Node.js CommonJS standard library only (`fs`, `path`). Must parse both
+        Claude Code (`Read`, `Bash`) and Antigravity (`view_file`, `run_command`)
+        input payload schemas without external npm packages.
+
+knowledge_base:
+  learnings:
+    scope: auto

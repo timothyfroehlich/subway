@@ -75,7 +75,13 @@ subway watch --pr <pr> --phase <ci|review> --expected-head <sha> [--title <title
 ```
 
 - **Behavior:** Invokes the repository's native PR lifecycle watcher without LLM mediation.
-- **Context impact:** 0 reasoning tokens during passive waits. Emits authoritative terminal JSON on standard output; on failure, automatically enriches the verdict with an extracted `failure_summary` from the failure report.
+- **Context impact:** 0 reasoning tokens during passive waits. Emits authoritative terminal JSON on standard output.
+- **CI Phase (`--phase ci`):** Automatically extracts failed step logs from failure reports into `failure_summary`.
+- **Review Phase (`--phase review`):**
+  - Identifies covering reviewer (`coderabbit`, `codex`, `local_attestation`).
+  - **Concurrent Review Adjudication:** Resolves on first success and tracks trailing in-progress reviewers (`concurrent_review_in_progress`, `pending_reviewers`, `review_notes`).
+  - **Rate-Limit Management:** Detects CodeRabbit quota exhaustion (5 reviews/hr) and triggers fallback (`coderabbit_rate_limited: true`, `review_fallback: "codex"`).
+  - **Findings Extraction:** Extracts actionable AI agent prompts and comment counts into `review_summary` and `actionable_comments`.
 - **Background execution:** Designed to run as a background command in host agent harnesses.
 
 ---

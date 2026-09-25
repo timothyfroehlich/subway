@@ -126,25 +126,6 @@ Quick one-shot queries to Flash:
 subway ask "Explain the difference between optimistic and pessimistic locking in Drizzle ORM"
 ```
 
-### PR Lifecycle Monitoring (`watch`)
-Monitor a PR's CI gate or review phase out-of-band with 0 LLM tokens:
-
-```bash
-subway watch --pr 1234 --phase <ci|review> --expected-head 40-character-sha [--title "PR Title"]
-```
-
-Output:
-```json
-{"schema_version": 1, "repository": "owner/repo", "pr": 1234, "phase": "review", "expected_head": "...", "observed_head": "...", "outcome": "passed", ...}
-```
-- **CI Phase (`--phase ci`):** On failure, automatically extracts failed step logs from the failure artifact and enriches the terminal JSON with `failure_summary`.
-- **Review Phase (`--phase review`):**
-  - Identifies covering reviewer (`coderabbit`, `codex`, `local_attestation`).
-  - **Concurrent Review Adjudication:** Reports on first success while alerting the caller if a second reviewer is still in progress (`concurrent_review_in_progress`, `pending_reviewers`, `review_notes`).
-  - **Rate-Limit Management:** Detects CodeRabbit quota exhaustion (5 reviews/hr) and directs fallback (`coderabbit_rate_limited: true`, `review_fallback: "codex"`).
-  - **Findings Extraction:** Extracts actionable AI agent prompts and comments into `review_summary` and `actionable_comments`.
-- **Pre-Review Prerequisite:** Always wait for current-head CI to pass before requesting or watching for review; never request code review on a PR that is failing or pending CI.
-
 ---
 
 ## Configuration Options

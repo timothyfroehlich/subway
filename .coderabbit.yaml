@@ -37,13 +37,13 @@ reviews:
       instructions: |
         Read `/AGENTS.md` before reviewing.
 
-        Zero Runtime Dependencies: Core Python tools (`lib/gemini_worker.py`,
-        `lib/watcher.py`) and Node hooks (`hooks/`) must rely strictly on
+        Zero Runtime Dependencies: Core Python tool (`lib/gemini_worker.py`)
+        and Node hooks (`hooks/`) must rely strictly on
         standard libraries (`urllib.request`, `json`, `pathlib`, `fs`, `path`, etc.).
         Never introduce runtime dependencies or external SDK packages.
 
-        Fail-Open Safety: PreToolUse hooks and monitoring runners MUST fail open
-        if `GEMINI_API_KEY` is not found, `gh` fails, or `subway` cannot be resolved.
+        Fail-Open Safety: PreToolUse hooks MUST fail open
+        if `GEMINI_API_KEY` is not found or `subway` cannot be resolved.
         A caller or agent harness must never be blocked or stranded by hook infrastructure failure.
 
         Pass-through Targeted Reads: Targeted reads (offsets, line ranges <= 350,
@@ -55,7 +55,7 @@ reviews:
     - path: "lib/**"
       instructions: |
         Python standard library only. Must remain compatible with Python 3.10+.
-        Preserve quote-aware shell parsing and process monitoring fail-open guarantees.
+        Preserve quote-aware shell parsing and fail-open guarantees.
 
     - path: "hooks/**"
       instructions: |

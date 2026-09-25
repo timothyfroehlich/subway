@@ -23,6 +23,48 @@ SUBWAY_BIN = REPO_ROOT / "bin" / "subway"
 DUMMY_SHA = "a" * 40
 
 
+# Mirrors PinPoint scripts/workflow/pr-watch.py argparse after PinPoint #2187:
+# `<PR> --phase ci|review --expected-head <SHA>` or `<PR> --check-ready`.
+# Unknown flags such as --json fail with exit 2 and empty stdout, like the real
+# script. Progress goes to stderr; stdout carries one terminal JSON line.
+FAKE_PR_WATCH = """\
+import argparse, json, re, sys
+from pathlib import Path
+
+def full_sha(value):
+    if re.fullmatch(r"[0-9a-f]{{40}}", value) is None:
+        raise argparse.ArgumentTypeError("must be a full 40-character SHA")
+    return value
+
+parser = argparse.ArgumentParser()
+parser.add_argument("pr", type=int)
+parser.add_argument("--phase", choices=("ci", "review"))
+parser.add_argument("--expected-head", type=full_sha)
+parser.add_argument("--check-ready", action="store_true")
+args = parser.parse_args()
+if args.check_ready and (args.phase or args.expected_head):
+    parser.error("--check-ready does not take --phase or --expected-head")
+if not args.check_ready and not (args.phase and args.expected_head):
+    parser.error("a watch needs both --phase and --expected-head")
+Path(__file__).with_name("argv.json").write_text(json.dumps(sys.argv[1:]))
+print("[00:00:00] CI Gate: IN_PROGRESS", file=sys.stderr)
+print(json.dumps({payload!r}, separators=(",", ":")), flush=True)
+sys.exit({exit_code})
+"""
+
+
+def _write_fake_pr_watch(
+    scripts_dir: Path, payload: dict[str, object], exit_code: int = 0
+) -> Path:
+    fake = scripts_dir / "pr-watch.py"
+    fake.write_text(FAKE_PR_WATCH.format(payload=payload, exit_code=exit_code))
+    return fake
+
+
+def _recorded_argv(scripts_dir: Path) -> list[str]:
+    return json.loads((scripts_dir / "argv.json").read_text())
+
+
 def _run_subway(
     *args: str, cwd: Path | None = None
 ) -> subprocess.CompletedProcess[str]:
@@ -159,8 +201,6 @@ def test_successful_watch_execution(tmp_path: Path) -> None:
     # Setup dummy repo structure
     scripts_dir = tmp_path / "scripts" / "workflow"
     scripts_dir.mkdir(parents=True)
-    fake_pr_watch = scripts_dir / "pr-watch.py"
-
     fake_payload = {
         "schema_version": 1,
         "repository": "owner/repo",
@@ -178,9 +218,7 @@ def test_successful_watch_execution(tmp_path: Path) -> None:
         "timestamp": "2026-09-12T20:00:00Z",
     }
 
-    fake_pr_watch.write_text(
-        f"import sys, json\nprint(json.dumps({fake_payload!r}))\nsys.exit(0)\n"
-    )
+    _write_fake_pr_watch(scripts_dir, fake_payload, exit_code=0)
 
     res = _run_subway(
         "watch",
@@ -203,10 +241,106 @@ def test_successful_watch_execution(tmp_path: Path) -> None:
     assert out["pr"] == 42
 
 
+def test_watch_invokes_post_2187_pr_watch_cli(tmp_path: Path) -> None:
+    scripts_dir = tmp_path / "scripts" / "workflow"
+    scripts_dir.mkdir(parents=True)
+    _write_fake_pr_watch(
+        scripts_dir,
+        {"schema_version": 1, "pr": 42, "phase": "ci", "outcome": "passed"},
+    )
+
+    res = _run_subway(
+        "watch",
+        "--pr",
+        "42",
+        "--phase",
+        "ci",
+        "--expected-head",
+        DUMMY_SHA,
+        "--worktree",
+        str(tmp_path),
+    )
+
+    assert res.returncode == 0, res.stderr
+    assert _recorded_argv(scripts_dir) == [
+        "42",
+        "--phase",
+        "ci",
+        "--expected-head",
+        DUMMY_SHA,
+    ]
+    assert "CI Gate: IN_PROGRESS" in res.stderr
+    lines = res.stdout.strip().splitlines()
+    assert len(lines) == 1
+    assert json.loads(lines[0])["outcome"] == "passed"
+
+
+def test_watch_passes_through_undetermined_verdict(tmp_path: Path) -> None:
+    scripts_dir = tmp_path / "scripts" / "workflow"
+    scripts_dir.mkdir(parents=True)
+    fake_payload = {
+        "schema_version": 1,
+        "repository": "timothyfroehlich/PinPoint",
+        "pr": 7,
+        "phase": "ci",
+        "expected_head": DUMMY_SHA,
+        "outcome": "undetermined",
+        "observed_head": DUMMY_SHA,
+        "ci_gate": "UNKNOWN",
+        "review_state": "not reviewed",
+        "unresolved_threads": 0,
+        "merge_state": "UNKNOWN",
+        "detail_url": None,
+        "failure_artifact": None,
+        "timestamp": "2026-09-25T20:00:00Z",
+    }
+    _write_fake_pr_watch(scripts_dir, fake_payload, exit_code=2)
+
+    res = _run_subway(
+        "watch",
+        "--pr",
+        "7",
+        "--phase",
+        "ci",
+        "--expected-head",
+        DUMMY_SHA,
+        "--worktree",
+        str(tmp_path),
+    )
+
+    assert res.returncode == 2
+    assert json.loads(res.stdout.strip()) == fake_payload
+
+
+def test_watch_usage_error_emits_undetermined(tmp_path: Path) -> None:
+    """A pr-watch usage error exits 2 with empty stdout; subway still emits JSON."""
+    scripts_dir = tmp_path / "scripts" / "workflow"
+    scripts_dir.mkdir(parents=True)
+    (scripts_dir / "pr-watch.py").write_text(
+        "import sys\nprint('usage: pr-watch.py', file=sys.stderr)\nsys.exit(2)\n"
+    )
+
+    res = _run_subway(
+        "watch",
+        "--pr",
+        "5",
+        "--phase",
+        "review",
+        "--expected-head",
+        DUMMY_SHA,
+        "--worktree",
+        str(tmp_path),
+    )
+
+    assert res.returncode == 2
+    out = json.loads(res.stdout.strip())
+    assert out["outcome"] == "undetermined"
+    assert out["phase"] == "review"
+
+
 def test_failed_watch_enriches_failure_summary(tmp_path: Path) -> None:
     scripts_dir = tmp_path / "scripts" / "workflow"
     scripts_dir.mkdir(parents=True)
-    fake_pr_watch = scripts_dir / "pr-watch.py"
 
     log_dir = tmp_path / "tmp" / "gh-monitor"
     log_dir.mkdir(parents=True)
@@ -241,9 +375,7 @@ def test_failed_watch_enriches_failure_summary(tmp_path: Path) -> None:
         "timestamp": "2026-09-12T20:00:00Z",
     }
 
-    fake_pr_watch.write_text(
-        f"import sys, json\nprint(json.dumps({fake_payload!r}))\nsys.exit(1)\n"
-    )
+    _write_fake_pr_watch(scripts_dir, fake_payload, exit_code=1)
 
     res = _run_subway(
         "watch",
@@ -267,8 +399,6 @@ def test_failed_watch_enriches_failure_summary(tmp_path: Path) -> None:
 def test_default_worktree_resolves_cwd(tmp_path: Path) -> None:
     scripts_dir = tmp_path / "scripts" / "workflow"
     scripts_dir.mkdir(parents=True)
-    fake_pr_watch = scripts_dir / "pr-watch.py"
-
     fake_payload = {
         "schema_version": 1,
         "repository": "owner/repo",
@@ -286,9 +416,7 @@ def test_default_worktree_resolves_cwd(tmp_path: Path) -> None:
         "timestamp": "2026-09-12T20:00:00Z",
     }
 
-    fake_pr_watch.write_text(
-        f"import sys, json\nprint(json.dumps({fake_payload!r}))\nsys.exit(0)\n"
-    )
+    _write_fake_pr_watch(scripts_dir, fake_payload, exit_code=0)
 
     # Run without --worktree, passing cwd=tmp_path
     res = _run_subway(
@@ -339,8 +467,6 @@ def test_watch_action_required_does_not_enrich_failure_summary(
 ) -> None:
     scripts_dir = tmp_path / "scripts" / "workflow"
     scripts_dir.mkdir(parents=True)
-    fake_pr_watch = scripts_dir / "pr-watch.py"
-
     fake_payload = {
         "schema_version": 1,
         "repository": "owner/repo",
@@ -358,9 +484,7 @@ def test_watch_action_required_does_not_enrich_failure_summary(
         "timestamp": "2026-09-12T20:00:00Z",
     }
 
-    fake_pr_watch.write_text(
-        f"import sys, json\nprint(json.dumps({fake_payload!r}))\nsys.exit(1)\n"
-    )
+    _write_fake_pr_watch(scripts_dir, fake_payload, exit_code=1)
 
     res = _run_subway(
         "watch",

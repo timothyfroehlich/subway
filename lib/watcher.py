@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import subprocess
 import sys
@@ -615,13 +614,7 @@ def run_watch(
         phase,
         "--expected-head",
         expected_head,
-        "--json",
     ]
-
-    env = dict(os.environ)
-    env.setdefault("GH_MONITOR_HARNESS", "subway")
-    env.setdefault("GH_MONITOR_MODEL", "none")
-    env["GH_MONITOR_WAKES"] = "1"
 
     if title:
         sys.stderr.write(
@@ -632,7 +625,6 @@ def run_watch(
     proc = subprocess.Popen(
         cmd,
         cwd=str(worktree),
-        env=env,
         stdout=subprocess.PIPE,
         stderr=sys.stderr,
         text=True,
@@ -641,7 +633,10 @@ def run_watch(
     stdout_data, _ = proc.communicate()
     exit_code = proc.returncode
 
-    stdout_text = stdout_data.strip() if stdout_data else ""
+    # pr-watch.py prints exactly one terminal JSON line on stdout; progress goes
+    # to stderr. A usage error (exit 2) leaves stdout empty.
+    stdout_lines = (stdout_data or "").strip().splitlines()
+    stdout_text = stdout_lines[-1].strip() if stdout_lines else ""
     if not stdout_text:
         payload = _undetermined_verdict(pr, phase, expected_head)
         print(json.dumps(payload))
@@ -650,7 +645,9 @@ def run_watch(
     try:
         payload = json.loads(stdout_text)
     except json.JSONDecodeError:
-        sys.stderr.write(f"[subway] Non-JSON output from watcher: {stdout_text}\n")
+        sys.stderr.write(
+            f"[subway] Non-JSON output from watcher: {stdout_data.strip()}\n"
+        )
         payload = _undetermined_verdict(pr, phase, expected_head)
         print(json.dumps(payload))
         return exit_code if exit_code != 0 else 2

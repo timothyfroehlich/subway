@@ -74,8 +74,10 @@ subway ask "<prompt>"
 subway watch --pr <pr> --phase <ci|review> --expected-head <sha> [--title <title>] [--worktree <path>]
 ```
 
-- **Behavior:** Invokes the repository's native PR lifecycle watcher without LLM mediation.
-- **Context impact:** 0 reasoning tokens during passive waits. Emits authoritative terminal JSON on standard output.
+- **Behavior:** Runs the target worktree's `scripts/workflow/pr-watch.py <pr> --phase <ci|review> --expected-head <sha>` without LLM mediation. That background `pr-watch.py --phase` wait is the canonical PR wait; `subway watch` wraps it and adds the enrichment below. It passes no other flags.
+- **Output:** `pr-watch.py` prints its progress to stderr and exactly one terminal JSON line on stdout. `subway watch` re-emits that line, enriched, on stdout. A GitHub error comes back as an `undetermined` verdict (exit 2), not a failure. If `pr-watch.py` prints no JSON (for example, a usage error), `subway watch` emits its own `undetermined` verdict.
+- **Exit codes:** Passed through from `pr-watch.py`: 0 `passed`; 1 `failed`, `stale`, `conflicting`, `action_required`; 2 `timed_out`, `undetermined`.
+- **Context impact:** 0 reasoning tokens during passive waits.
 - **CI Phase (`--phase ci`):** Automatically extracts failed step logs from failure reports into `failure_summary`.
 - **Review Phase (`--phase review`):**
   - Identifies covering reviewer (`coderabbit`, `codex`, `local_attestation`).
